@@ -115,6 +115,7 @@ services:
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `MEDIA_DIRS` | `/media` | 媒体库目录，多个用 `:` 分隔 |
+| `PATH_MAP` | 空 | 容器路径=宿主路径，用于匹配数据库记录，多个用 `,` 分隔 |
 | `TRIM_DB` | `/trim/db/trimmedia.db` | 飞牛影视数据库路径 |
 | `TRIM_IMG_DIR` | `/trim/img` | 飞牛影视图片目录 |
 | `CRON` | `5 2 * * *` | 执行时间，标准 5 段 cron |
@@ -129,6 +130,28 @@ services:
 | `HTTP_TIMEOUT` | `25` | 下载超时（秒） |
 | `MAX_IMG_BYTES` | `8388608` | 单张图片大小上限 |
 | `LOG_LEVEL` | `INFO` | 日志级别 |
+
+### 关于 PATH_MAP
+
+飞牛影视数据库里存的是**宿主路径**，而容器里看到的媒体库通常是 `/media`。
+两者不一致时会匹配不到条目，这时需要告诉容器它们的对应关系：
+
+```yaml
+environment:
+  MEDIA_DIRS: /media
+  PATH_MAP: /media=/vol6/1000/media/download/STRM
+volumes:
+  - /vol6/1000/media/download/STRM:/media:ro
+```
+
+如果直接把媒体库挂载成和宿主相同的路径，就可以不配 `PATH_MAP`：
+
+```yaml
+environment:
+  MEDIA_DIRS: /vol6/1000/media/download/STRM
+volumes:
+  - /vol6/1000/media/download/STRM:/vol6/1000/media/download/STRM:ro
+```
 
 ---
 
