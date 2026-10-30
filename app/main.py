@@ -51,16 +51,41 @@ def find_videos(directory, base_name):
 
 
 def collect_nfo_files():
-    found = []
+    """按目录收集 NFO，同一目录只保留一个（优先与正片同名的，其次非 movie.nfo）。"""
+    by_dir = {}
     for root_dir in config.MEDIA_DIRS:
         if not os.path.isdir(root_dir):
             log.warning("媒体目录不存在，已跳过：%s", root_dir)
             continue
         for current, _dirs, files in os.walk(root_dir):
-            for name in files:
-                if name.lower().endswith(".nfo"):
-                    found.append(os.path.join(current, name))
-    return found
+            if not files:
+                continue
+            nfos = [name for name in files if name.lower().endswith(".nfo")]
+            if not nfos:
+                continue
+
+            videos = [
+                os.path.splitext(name)[0]
+                for name in files
+                if os.path.splitext(name)[1].lower() in config.MEDIA_EXTS
+            ]
+
+            chosen = None
+            for name in nfos:
+                if os.path.splitext(name)[0] in videos:
+                    chosen = name
+                    break
+            if chosen is None:
+                for name in nfos:
+                    if name.lower() != "movie.nfo":
+                        chosen = name
+                        break
+            if chosen is None:
+                chosen = nfos[0]
+
+            by_dir[current] = os.path.join(current, chosen)
+
+    return list(by_dir.values())
 
 
 def handle_nfo(db, nfo_path):
@@ -101,6 +126,9 @@ def handle_nfo(db, nfo_path):
 def run_once():
     started = time.time()
     log.info("开始同步：媒体目录 %s", ", ".join(config.MEDIA_DIRS) or "(未配置)")
+    if config.PATH_MAP:
+        for container, host in config.PATH_MAP.items():
+            log.info("路径映射：%s → %s", container, host)
 
     nfo_files = collect_nfo_files()
     if not nfo_files:
@@ -121,6 +149,7 @@ def run_once():
             download_images=config.DOWNLOAD_ACTOR_IMAGES,
             http_timeout=config.HTTP_TIMEOUT,
             max_img_bytes=config.MAX_IMG_BYTES,
+            path_map=config.PATH_MAP,
         ).open()
     except Exception as exc:  # noqa: BLE001
         log.error("打开数据库失败：%s", exc)

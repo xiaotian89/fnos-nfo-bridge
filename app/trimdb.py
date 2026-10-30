@@ -18,7 +18,8 @@ log = logging.getLogger("trimdb")
 
 class TrimDB:
     def __init__(self, path, img_root, dry_run=False, backup=True, proxy="",
-                 overwrite=True, download_images=True, http_timeout=25, max_img_bytes=8 * 1024 * 1024):
+                 overwrite=True, download_images=True, http_timeout=25,
+                 max_img_bytes=8 * 1024 * 1024, path_map=None):
         self.path = path
         self.img_root = img_root
         self.dry_run = dry_run
@@ -28,9 +29,19 @@ class TrimDB:
         self.download_images = download_images
         self.http_timeout = http_timeout
         self.max_img_bytes = max_img_bytes
+        self.path_map = path_map or {}
         self._backed_up = False
         self._columns = {}
         self.conn = None
+
+    def to_host_path(self, path):
+        """把容器内路径还原成数据库里的宿主路径。"""
+        for container_prefix, host_prefix in self.path_map.items():
+            if path == container_prefix:
+                return host_prefix
+            if path.startswith(container_prefix + os.sep):
+                return host_prefix + path[len(container_prefix):]
+        return path
 
     # ---------- 连接 ----------
 
@@ -78,13 +89,14 @@ class TrimDB:
 
     def find_item_for_video(self, video_path):
         """按视频路径找条目，优先 Video，其次同目录的 Directory。"""
+        host_path = self.to_host_path(video_path)
         row = self.conn.execute(
-            "SELECT guid, type, path FROM item WHERE path = ? LIMIT 1", (video_path,)
+            "SELECT guid, type, path FROM item WHERE path = ? LIMIT 1", (host_path,)
         ).fetchone()
         if row:
             return row
 
-        directory = os.path.dirname(video_path)
+        directory = self.to_host_path(os.path.dirname(video_path))
         row = self.conn.execute(
             "SELECT guid, type, path FROM item WHERE path = ? AND type = 'Directory' LIMIT 1",
             (directory,),
@@ -92,8 +104,9 @@ class TrimDB:
         return row
 
     def find_item_any_by_dir(self, directory):
+        host_dir = self.to_host_path(directory)
         return self.conn.execute(
-            "SELECT guid, type, path FROM item WHERE path = ? LIMIT 1", (directory,)
+            "SELECT guid, type, path FROM item WHERE path = ? LIMIT 1", (host_dir,)
         ).fetchone()
 
     # ---------- 写入 ----------

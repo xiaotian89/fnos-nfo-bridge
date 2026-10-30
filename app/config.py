@@ -53,6 +53,30 @@ MEDIA_EXTS = tuple(
     )
 )
 
+
+def _path_map(value):
+    """解析路径映射：容器路径=宿主路径，多个用逗号分隔。
+
+    飞牛影视数据库里存的是宿主路径，容器内看到的路径可能不同，
+    匹配条目时需要把容器路径还原成宿主路径。
+    """
+    mapping = {}
+    if not value:
+        return mapping
+    for pair in value.split(","):
+        pair = pair.strip()
+        if not pair or "=" not in pair:
+            continue
+        container, host = pair.split("=", 1)
+        container = container.strip().rstrip("/")
+        host = host.strip().rstrip("/")
+        if container and host:
+            mapping[container] = host
+    return mapping
+
+
+PATH_MAP = _path_map(os.getenv("PATH_MAP", ""))
+
 # 是否下载演员头像到本地
 DOWNLOAD_ACTOR_IMAGES = _bool(os.getenv("DOWNLOAD_ACTOR_IMAGES"), True)
 

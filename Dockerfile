@@ -1,4 +1,4 @@
-FROM python:3.12-alpine
+FROM python:3.11-slim
 
 LABEL org.opencontainers.image.title="fnos-nfo-bridge" \
       org.opencontainers.image.description="Sync NFO metadata into fnOS (Feiniu) Trim Media database" \
@@ -8,9 +8,11 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     TZ=Asia/Shanghai
 
-RUN apk add --no-cache tzdata \
-    && cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
-    && echo "Asia/Shanghai" > /etc/timezone
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tzdata \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+    && echo $TZ > /etc/timezone \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 

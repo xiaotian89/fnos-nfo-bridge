@@ -27,6 +27,8 @@ services:
     environment:
       TZ: Asia/Shanghai
       MEDIA_DIRS: /media
+      # 容器路径=宿主路径，用来匹配飞牛数据库里的记录
+      PATH_MAP: /media=/vol6/1000/media/download/STRM
       TRIM_DB: /trim/db/trimmedia.db
       TRIM_IMG_DIR: /trim/img
       # 与刮削器联动：比刮削任务结束时间晚 5 分钟，之后每小时兜底一次
