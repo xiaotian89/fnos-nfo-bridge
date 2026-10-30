@@ -1,29 +1,43 @@
 services:
+  # 刮削器：扫媒体库，生成 NFO / 海报 / 剧照
+  javsp-web:
+    image: apecme/javsp-web:bata
+    container_name: javsp-web
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    environment:
+      TZ: Asia/Shanghai
+      # 数据源在墙外时需要代理，不需要就删掉这三行
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      NO_PROXY: localhost,127.0.0.1
+    volumes:
+      - ./data:/app/data
+      # 媒体库：刮削器要能写 NFO 和图片，所以不能只读
+      - /vol6/1000/media/download/STRM:/video
+
+  # 元数据桥：把 NFO 写进飞牛影视数据库，并落地演员头像
   fnos-nfo-bridge:
     image: ghcr.io/xiaotian89/fnos-nfo-bridge:latest
     container_name: fnos-nfo-bridge
     restart: unless-stopped
+    depends_on:
+      - javsp-web
     environment:
       TZ: Asia/Shanghai
-      # 媒体库目录（容器内路径），多个用冒号分隔
       MEDIA_DIRS: /media
-      # 飞牛影视数据库与图片目录
       TRIM_DB: /trim/db/trimmedia.db
       TRIM_IMG_DIR: /trim/img
-      # 自定义执行时间：标准 5 段 cron，默认每天 02:05
+      # 与刮削器联动：比刮削任务结束时间晚 5 分钟，之后每小时兜底一次
       CRON: "5 2 * * *"
-      # 启动时先跑一次
       RUN_ON_START: "true"
-      # 下载演员头像用的代理（不需要就删掉）
+      # 下载演员头像用的代理（不需要就留空）
       PROXY: ""
-      # 是否用 NFO 覆盖数据库已有内容
       OVERWRITE: "true"
-      # 首次写入前备份数据库
       BACKUP_DB: "true"
     volumes:
-      # 媒体库（只读）
+      # 与 javsp-web 挂同一个媒体库，NFO 写完这里立刻能读到
       - /vol6/1000/media/download/STRM:/media:ro
-      # 飞牛影视数据库目录（需要可写）
       - /usr/local/apps/@appdata/trim.media/database:/trim/db
-      # 飞牛影视图片目录（需要可写）
       - /usr/local/apps/@appdata/trim.media/img:/trim/img

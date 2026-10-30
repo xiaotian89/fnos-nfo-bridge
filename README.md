@@ -33,7 +33,7 @@
 
 ## 快速开始
 
-### docker compose（推荐）
+### 单独部署
 
 ```yaml
 services:
@@ -54,27 +54,59 @@ services:
       - /usr/local/apps/@appdata/trim.media/img:/trim/img
 ```
 
-启动：
-
 ```bash
 docker compose up -d
 docker logs -f fnos-nfo-bridge
 ```
 
-### 只跑一次（试运行，不写库）
+### 和刮削器放在同一个 compose（推荐）
 
-```bash
-docker run --rm \
-  -e MEDIA_DIRS=/media \
-  -e TRIM_DB=/trim/db/trimmedia.db \
-  -e TRIM_IMG_DIR=/trim/img \
-  -e RUN_ONCE=true \
-  -e DRY_RUN=true \
-  -v /vol6/1000/media/download/STRM:/media:ro \
-  -v /usr/local/apps/@appdata/trim.media/database:/trim/db \
-  -v /usr/local/apps/@appdata/trim.media/img:/trim/img \
-  ghcr.io/xiaotian89/fnos-nfo-bridge:latest
+刮削器和同步器共享同一个媒体库目录，刮完就能同步，管理也只有一个文件。
+
+```yaml
+services:
+  javsp-web:
+    image: apecme/javsp-web:bata
+    container_name: javsp-web
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    environment:
+      TZ: Asia/Shanghai
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      NO_PROXY: localhost,127.0.0.1
+    volumes:
+      - ./data:/app/data
+      - /vol6/1000/media/download/STRM:/video
+
+  fnos-nfo-bridge:
+    image: ghcr.io/xiaotian89/fnos-nfo-bridge:latest
+    container_name: fnos-nfo-bridge
+    restart: unless-stopped
+    depends_on:
+      - javsp-web
+    environment:
+      TZ: Asia/Shanghai
+      MEDIA_DIRS: /media
+      TRIM_DB: /trim/db/trimmedia.db
+      TRIM_IMG_DIR: /trim/img
+      CRON: "5 2 * * *"
+      RUN_ON_START: "true"
+    volumes:
+      - /vol6/1000/media/download/STRM:/media:ro
+      - /usr/local/apps/@appdata/trim.media/database:/trim/db
+      - /usr/local/apps/@appdata/trim.media/img:/trim/img
 ```
+
+联动要点：
+
+| 项目 | 说明 |
+| --- | --- |
+| 共享目录 | 两个容器挂同一个媒体库，刮削器写 NFO，同步器读 NFO |
+| 执行顺序 | 刮削器 `02:00` 跑，同步器 `02:05` 跑（`CRON: "5 2 * * *"`） |
+| 更快同步 | 想接近实时，把同步器改成 `CRON: "*/10 * * * *"` |
+| 依赖关系 | `depends_on` 只保证启动顺序，不保证任务完成，顺序靠 cron 时间错开 |
 
 ---
 
